@@ -55,6 +55,13 @@ describe('Static endpoints', function() {
       testStatic(prefix, '0,0,0,/256x256', 'png', 404);
       testStatic(prefix, '0,0,0,0,/256x256', 'png', 404);
     });
+
+    describe('with markers', function() {
+        testStatic(prefix, '0,0,0/300x300', 'png', 200, 2, undefined, '?markers=0,0');
+        testStatic(prefix, '0,0,0/300x300', 'png', 200, 3, undefined, '?markers=0,0|0,0.05');
+        testStatic(prefix, '0,0,1.5/256x256', 'png', 200, undefined, undefined, '?markers=0,1');
+        testStatic(prefix, '80,40,20/600x300', 'png', 200, 3, undefined, '?markers=40,20|40.003,20.0023');
+    });
   });
 
   describe('area-based', function() {

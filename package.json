@@ -43,8 +43,8 @@
     "tileserver-gl-styles": "1.2.0"
   },
   "devDependencies": {
+    "mocha": "^3.5.3",
     "should": "^11.2.0",
-    "mocha": "^3.2.0",
     "supertest": "^3.0.0"
   }
 }

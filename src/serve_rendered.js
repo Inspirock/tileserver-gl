@@ -368,6 +368,20 @@ module.exports = function(options, repo, params, id, dataResolver) {
     }
   });
 
+  var markerImage,
+      markerWidth = 36,
+      markerHeight = 36;
+  var markerLoadPromise = new Promise(function(resolve, reject) {
+    fs.readFile(__dirname + '/map-marker.png', function(error, data) {
+      if (error) {
+        reject();
+      }
+      markerImage = new Canvas.Image();
+      markerImage.src = data;
+      resolve();
+    });
+  });
+
   repo[id] = tileJSON;
 
   var tilePattern = '/' + id + '/:z(\\d+)/:x(\\d+)/:y(\\d+)' +
@@ -516,9 +530,30 @@ module.exports = function(options, repo, params, id, dataResolver) {
     return path;
   };
 
+  var extractMarkersFromQuery = function(query, transformer) {
+    var markerParts = (query.markers || '').split('|');
+    var markers = [];
+    markerParts.forEach(function(pair) {
+      var pairParts = pair.split(',');
+      if (pairParts.length == 2) {
+        var pair;
+        if (query.latlng == '1' || query.latlng == 'true') {
+          pair = [+(pairParts[1]), +(pairParts[0])];
+        } else {
+          pair = [+(pairParts[0]), +(pairParts[1])];
+        }
+        if (transformer) {
+          pair = transformer(pair);
+        }
+        markers.push(pair);
+      }
+    });
+    return markers;
+  };
+
   var renderOverlay = function(z, x, y, bearing, pitch, w, h, scale,
-                               path, query) {
-    if (!path || path.length < 2) {
+                               path, markers, query) {
+    if ((!path || path.length < 2) && (!markers || markers.length < 1)) {
       return null;
     }
     var precisePx = function(ll, zoom) {
@@ -549,24 +584,40 @@ module.exports = function(options, repo, params, id, dataResolver) {
       // optimized path
       ctx.translate(-center[0] + w / 2, -center[1] + h / 2);
     }
-    var lineWidth = query.width !== undefined ?
-                    parseFloat(query.width) : 1;
-    ctx.lineWidth = lineWidth;
-    ctx.strokeStyle = query.stroke || 'rgba(0,64,255,0.7)';
-    ctx.fillStyle = query.fill || 'rgba(255,255,255,0.4)';
-    ctx.beginPath();
-    path.forEach(function(pair) {
-      var px = precisePx(pair, z);
-      ctx.lineTo(px[0], px[1]);
-    });
-    if (path[0][0] == path[path.length - 1][0] &&
-        path[0][1] == path[path.length - 1][1]) {
-      ctx.closePath();
+    if (path && path.length) {
+      var lineWidth = query.width !== undefined ?
+                      parseFloat(query.width) : 1;
+      ctx.lineWidth = lineWidth;
+      ctx.strokeStyle = query.stroke || 'rgba(0,64,255,0.7)';
+      ctx.fillStyle = query.fill || 'rgba(255,255,255,0.4)';
+      ctx.beginPath();
+      path.forEach(function(pair) {
+        var px = precisePx(pair, z);
+        ctx.lineTo(px[0], px[1]);
+      });
+      if (path[0][0] == path[path.length - 1][0] &&
+          path[0][1] == path[path.length - 1][1]) {
+        ctx.closePath();
+      }
+      ctx.fill();
+      if (lineWidth > 0) {
+        ctx.stroke();
+      }
     }
-    ctx.fill();
-    if (lineWidth > 0) {
+
+    markers.forEach(function(pair) {
+      var coordinates = precisePx(pair, z);
+      // draw circle
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(Math.round(coordinates[0]), Math.round(coordinates[1]), 4, 0, 360);
       ctx.stroke();
-    }
+      // draw map marker
+      coordinates[0] -= markerWidth / 2;
+      coordinates[1] -= markerHeight - 2; // 1 offset since bottom of image has some space for shadow
+      ctx.drawImage(markerImage, Math.round(coordinates[0]), Math.round(coordinates[1]), markerWidth, markerHeight);
+    });
 
     return canvas.toBuffer();
   };
@@ -628,8 +679,9 @@ module.exports = function(options, repo, params, id, dataResolver) {
       }
 
       var path = extractPathFromQuery(req.query, transformer);
+      var markers = extractMarkersFromQuery(req.query, transformer);
       var overlay = renderOverlay(z, x, y, bearing, pitch, w, h, scale,
-                                  path, req.query);
+                                  path, markers, req.query);
 
       return respondImage(z, x, y, bearing, pitch, w, h, scale, format,
                           res, next, overlay);
@@ -666,8 +718,9 @@ module.exports = function(options, repo, params, id, dataResolver) {
           pitch = 0;
 
       var path = extractPathFromQuery(req.query, transformer);
+      var markers = extractMarkersFromQuery(req.query, transformer);
       var overlay = renderOverlay(z, x, y, bearing, pitch, w, h, scale,
-                                  path, req.query);
+                                  path, markers, req.query);
       return respondImage(z, x, y, bearing, pitch, w, h, scale, format,
                           res, next, overlay);
     };
@@ -736,8 +789,9 @@ module.exports = function(options, repo, params, id, dataResolver) {
           x = center[0],
           y = center[1];
 
+      var markers = extractMarkersFromQuery(req.query, transformer);
       var overlay = renderOverlay(z, x, y, bearing, pitch, w, h, scale,
-                                  path, req.query);
+                                  path, markers, req.query);
 
       return respondImage(z, x, y, bearing, pitch, w, h, scale, format,
                           res, next, overlay);
@@ -751,7 +805,7 @@ module.exports = function(options, repo, params, id, dataResolver) {
     return res.send(info);
   });
 
-  return Promise.all([fontListingPromise, renderersReadyPromise]).then(function() {
+  return Promise.all([fontListingPromise, markerLoadPromise, renderersReadyPromise]).then(function() {
     return app;
   });
 
