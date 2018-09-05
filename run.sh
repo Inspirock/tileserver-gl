@@ -15,7 +15,7 @@ sleep 3
 export DISPLAY=:99.0
 
 cd /data
-node /usr/src/app/ -p 80 "$@" &
+node --max_old_space_size=256 /usr/src/app/ -p 80 "$@" &
 child=$!
 wait "$child"
 
