@@ -1,5 +1,5 @@
 {
-  "name": "tileserver-gl",
+  "name": "@inspirock/tileserver-gl",
   "version": "2.3.1",
   "description": "Map tile server for JSON GL styles - vector and server side generated raster tiles",
   "main": "src/main.js",
@@ -9,7 +9,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/klokantech/tileserver-gl.git"
+    "url": "git+https://github.com/Inspirock/tileserver-gl"
   },
   "license": "BSD-2-Clause",
   "engines": {
